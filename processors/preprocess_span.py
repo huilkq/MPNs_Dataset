@@ -72,8 +72,9 @@ def collate_fn(batch):
     return all_input_ids, all_input_mask, all_segment_ids, all_start_ids, all_end_ids, all_lens
 
 
+
 def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer,
-                                 cls_token_at_end=False, cls_token="[CLS]", cls_token_segment_id=1,
+                                 cls_token_at_end=False, cls_token="[CLS]", cls_token_segment_id=0,
                                  sep_token="[SEP]", pad_on_left=False, pad_token=0, pad_token_segment_id=0,
                                  sequence_a_segment_id=0, mask_padding_with_zero=True, ):
     """ Loads a data file into a list of `InputBatch`s
@@ -92,16 +93,29 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         if isinstance(textlist, list):
             textlist = " ".join(textlist)
         tokens = tokenizer.tokenize(textlist)
-        start_ids = [0] * len(tokens)
-        end_ids = [0] * len(tokens)
+        all_start_ids = [0] * len(tokens)
+        all_end_ids = [0] * len(tokens)
         subjects_id = []
         for subject in subjects:
             label = subject[0]
             start = subject[1]
             end = subject[2]
-            start_ids[start] = label2id[label]
-            end_ids[end] = label2id[label]
-            subjects_id.append((label2id[label], start, end))
+            all_start_ids[start] = label2id[label]
+            all_end_ids[end] = label2id[label]
+            subjects_id.append((label2id[label], start, end+1))
+        start_ids = []
+        end_ids = []
+        for idx, (token, start_label, end_label) in enumerate(
+                zip(example.text_a, all_start_ids, all_end_ids)):
+            tmp_subword_lst = tokenizer.tokenize(token)
+            if len(tmp_subword_lst) > 1:
+                start_ids.append(start_label)
+                start_ids.extend([0] * (len(tmp_subword_lst) - 1))
+                end_ids.extend([0] * (len(tmp_subword_lst) - 1))
+                end_ids.append(end_label)
+            elif len(tmp_subword_lst) == 1:
+                start_ids.append(start_label)
+                end_ids.append(end_label)
         # Account for [CLS] and [SEP] with "- 2".
         special_tokens_count = 2
         if len(tokens) > max_seq_length - special_tokens_count:
@@ -130,16 +144,16 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         start_ids += [0]
         end_ids += [0]
         segment_ids = [sequence_a_segment_id] * len(tokens)
-        if cls_token_at_end:
-            tokens += [cls_token]
-            start_ids += [0]
-            end_ids += [0]
-            segment_ids += [cls_token_segment_id]
-        else:
-            tokens = [cls_token] + tokens
-            start_ids = [0] + start_ids
-            end_ids = [0] + end_ids
-            segment_ids = [cls_token_segment_id] + segment_ids
+        # if cls_token_at_end:
+        #     tokens += [cls_token]
+        #     start_ids += [0]
+        #     end_ids += [0]
+        #     segment_ids += [cls_token_segment_id]
+        # else:
+        tokens = [cls_token] + tokens
+        start_ids = [0] + start_ids
+        end_ids = [0] + end_ids
+        segment_ids = [cls_token_segment_id] + segment_ids
 
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
@@ -148,19 +162,20 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         input_len = len(input_ids)
         # Zero-pad up to the sequence length.
         padding_length = max_seq_length - len(input_ids)
-        if pad_on_left:
-            input_ids = ([pad_token] * padding_length) + input_ids
-            input_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + input_mask
-            segment_ids = ([pad_token_segment_id] * padding_length) + segment_ids
-            start_ids = ([0] * padding_length) + start_ids
-            end_ids = ([0] * padding_length) + end_ids
-        else:
-            input_ids += [pad_token] * padding_length
-            input_mask += [0 if mask_padding_with_zero else 1] * padding_length
-            segment_ids += [pad_token_segment_id] * padding_length
-            start_ids += ([0] * padding_length)
-            end_ids += ([0] * padding_length)
+        # if pad_on_left:
+        #     input_ids = ([pad_token] * padding_length) + input_ids
+        #     input_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + input_mask
+        #     segment_ids = ([pad_token_segment_id] * padding_length) + segment_ids
+        #     start_ids = ([0] * padding_length) + start_ids
+        #     end_ids = ([0] * padding_length) + end_ids
+        # else:
+        input_ids += [pad_token] * padding_length
+        input_mask += [0 if mask_padding_with_zero else 1] * padding_length
+        segment_ids += [pad_token_segment_id] * padding_length
+        start_ids += ([0] * padding_length)
+        end_ids += ([0] * padding_length)
 
+        print(len(start_ids))
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length

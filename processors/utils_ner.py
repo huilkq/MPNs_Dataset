@@ -129,7 +129,7 @@ def bert_extract_items(start_logits, end_logits):
             continue
         for j, e_l in enumerate(end_pred[i:]):
             if s_l == e_l:
-                S.append((s_l, i, i + j))
+                S.append((s_l, i, i + j+1))
                 break
 
     # 以下代码得到S_final。 即将得到的(2, 5, 15), (2, 11, 15)只保留一个(2, 11, 15)。
@@ -153,6 +153,6 @@ def bert_extract_item(start_logits, end_logits):
             continue
         for j, e_l in enumerate(end_pred[i:]):
             if s_l == e_l:
-                S.append((s_l, i, i + j))
+                S.append((s_l, i, i + j+1))
                 break
     return S

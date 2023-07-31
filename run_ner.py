@@ -85,12 +85,10 @@ def train(args, train_dataset, model, tokenizer):
                       "start_positions": batch[3], "end_positions": batch[4]}
             # optimizer.zero_grad()
             outputs = model(**inputs)
-            loss, start_logits, end_logits = outputs[
-                                             :3]  # model outputs are always tuple in pytorch-transformers (see doc)
+            loss, start_logits, end_logits = outputs[:3]  # model outputs are always tuple in pytorch-transformers (see doc)
 
             R_final = bert_extract_item(start_logits, end_logits)
             T = bert_extract_items(batch[3], batch[4])
-            # print(R_final)
             metric.update(true_subject=T, pred_subject=R_final)
 
             # if args.n_gpu > 1:
@@ -149,6 +147,7 @@ def evaluate(args, model, tokenizer, prefix=""):
         segment_ids = torch.tensor([f.segment_ids[:input_lens]], dtype=torch.long).to(args.device)
         start_ids = torch.tensor([f.start_ids[:input_lens]], dtype=torch.long).to(args.device)
         end_ids = torch.tensor([f.end_ids[:input_lens]], dtype=torch.long).to(args.device)
+        subjects = f.subjects
         model.eval()
         with torch.no_grad():
             # batch = tuple(t.to(args.device) for t in batch)
@@ -162,7 +161,6 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         R_final = bert_extract_item(start_logits, end_logits)
         T = bert_extract_items(start_ids, end_ids)
-
         metric.update(true_subject=T, pred_subject=R_final)
         if args.n_gpu > 1:
             tmp_eval_loss = tmp_eval_loss.mean()  # mean() to average on multi-gpu parallel evaluating
